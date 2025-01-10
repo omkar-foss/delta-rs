@@ -427,7 +427,9 @@ impl UnityCatalogBuilder {
 
     /// Returns the storage location and temporary token to be used with the
     /// Unity Catalog table.
-    pub async fn get_uc_location_and_token(table_uri: &str) -> Result<(String, String), UnityCatalogError> {
+    pub async fn get_uc_location_and_token(
+        table_uri: &str,
+    ) -> Result<(String, String), UnityCatalogError> {
         let uri_parts: Vec<&str> = table_uri[5..].split('.').collect();
         if uri_parts.len() != 3 {
             panic!("Invalid Unity Catalog URI: {}", table_uri);
@@ -441,15 +443,13 @@ impl UnityCatalogBuilder {
             Ok(uc) => uc,
             Err(_e) => panic!("Unable to build Unity Catalog."),
         };
-        let storage_location =
-            match unity_catalog.get_table_storage_location(
-                Some(catalog_id.to_string()),
-                database_name,
-                table_name,
-            ).await {
-                Ok(s) => s,
-                Err(_e) => panic!("Unable to find the table's storage location."),
-            };
+        let storage_location = match unity_catalog
+            .get_table_storage_location(Some(catalog_id.to_string()), database_name, table_name)
+            .await
+        {
+            Ok(s) => s,
+            Err(_e) => panic!("Unable to find the table's storage location."),
+        };
         let token = unity_catalog.get_credential().await?;
         let credential = match token.to_str() {
             Ok(header_str) => header_str.to_string(),
@@ -774,10 +774,14 @@ mod tests {
             .unwrap();
         assert!(matches!(get_table_response, GetTableResponse::Success(_)));
 
-        let storage_location = client.get_table_storage_location(
-            Some("catalog_name".to_string()), "schema_name", "table_name",
-        ).await
-        .unwrap();
+        let storage_location = client
+            .get_table_storage_location(
+                Some("catalog_name".to_string()),
+                "schema_name",
+                "table_name",
+            )
+            .await
+            .unwrap();
         assert!(storage_location.eq_ignore_ascii_case("string"));
     }
 }
