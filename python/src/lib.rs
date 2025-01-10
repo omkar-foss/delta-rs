@@ -78,6 +78,7 @@ use crate::merge::PyMergeBuilder;
 use crate::query::PyQueryBuilder;
 use crate::schema::{schema_to_pyobject, Field};
 use crate::utils::rt;
+use deltalake_catalog_unity::UnityCatalogBuilder;
 
 #[derive(FromPyObject)]
 enum PartitionFilterValue {
@@ -171,12 +172,24 @@ impl RawDeltaTable {
         log_buffer_size: Option<usize>,
     ) -> PyResult<Self> {
         py.allow_threads(|| {
-            let mut builder = deltalake::DeltaTableBuilder::from_uri(table_uri)
-                .with_io_runtime(IORuntime::default());
-            let options = storage_options.clone().unwrap_or_default();
-            if let Some(storage_options) = storage_options {
-                builder = builder.with_storage_options(storage_options)
+            let (table_path, uc_token) = if UnityCatalogBuilder::is_unity_catalog_uri(table_uri) {
+                match rt().block_on(UnityCatalogBuilder::get_uc_location_and_token(table_uri)) {
+                    Ok(tup) => tup,
+                    Err(err) => return Err(PyRuntimeError::new_err(err.to_string())),
+                }
+            } else {
+                (table_uri.to_string(), "".to_string())
+            };
+
+            let mut options = storage_options.clone().unwrap_or_default();
+            if !uc_token.is_empty() {
+                options.insert("UNITY_CATALOG_TEMPORARY_TOKEN".to_string(), uc_token);
             }
+
+            let mut builder = deltalake::DeltaTableBuilder::from_uri(&table_path)
+                .with_io_runtime(IORuntime::default());
+            builder = builder.with_storage_options(options.clone());
+
             if let Some(version) = version {
                 builder = builder.with_version(version)
             }
@@ -193,7 +206,7 @@ impl RawDeltaTable {
             Ok(RawDeltaTable {
                 _table: Arc::new(Mutex::new(table)),
                 _config: FsConfig {
-                    root_url: table_uri.into(),
+                    root_url: table_path,
                     options,
                 },
             })
@@ -206,10 +219,23 @@ impl RawDeltaTable {
         table_uri: &str,
         storage_options: Option<HashMap<String, String>>,
     ) -> PyResult<bool> {
-        let mut builder = deltalake::DeltaTableBuilder::from_uri(table_uri);
-        if let Some(storage_options) = storage_options {
-            builder = builder.with_storage_options(storage_options)
+        let (table_path, uc_token) = if UnityCatalogBuilder::is_unity_catalog_uri(table_uri) {
+            match rt().block_on(UnityCatalogBuilder::get_uc_location_and_token(table_uri)) {
+                Ok(tup) => tup,
+                Err(err) => return Err(PyRuntimeError::new_err(err.to_string())),
+            }
+        } else {
+            (table_uri.to_string(), "".to_string())
+        };
+
+        let mut options = storage_options.clone().unwrap_or_default();
+        if !uc_token.is_empty() {
+            options.insert("UNITY_CATALOG_TEMPORARY_TOKEN".to_string(), uc_token);
         }
+
+        let mut builder = deltalake::DeltaTableBuilder::from_uri(&table_path)
+            .with_io_runtime(IORuntime::default());
+        builder = builder.with_storage_options(options.clone());
         Ok(rt()
             .block_on(async {
                 match builder.build() {

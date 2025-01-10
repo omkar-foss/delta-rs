@@ -266,14 +266,14 @@ pub struct TableSummary {
 pub struct Table {
     /// Username of table creator.
     #[serde(default)]
-    pub created_by: String,
+    pub created_by: Option<String>,
 
     /// Name of table, relative to parent schema.
     pub name: String,
 
     /// Username of user who last modified the table.
     #[serde(default)]
-    pub updated_by: String,
+    pub updated_by: Option<String>,
 
     /// List of schemes whose objects can be referenced without qualification.
     #[serde(default)]
@@ -283,6 +283,7 @@ pub struct Table {
     pub data_source_format: DataSourceFormat,
 
     /// Full name of table, in form of catalog_name.schema_name.table_name
+    #[serde(default)]
     pub full_name: String,
 
     /// Name of parent schema relative to its parent catalog.
@@ -292,6 +293,7 @@ pub struct Table {
     pub storage_location: String,
 
     /// Unique identifier of parent metastore.
+    #[serde(default)]
     pub metastore_id: String,
 }
 
