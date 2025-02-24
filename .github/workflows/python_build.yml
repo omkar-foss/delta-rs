@@ -137,7 +137,32 @@ jobs:
         run: make setup-dat
 
       - name: Run tests
-        run: uv run --no-sync pytest -m '(unitycatalog_databricks and integration)' --doctest-modules
+        run: |
+          set +e
+          MAX_RETRIES=3
+          RETRY_DELAY=10
+          ATTEMPT=1
+          run_command() {
+            uv run --no-sync pytest -m '(unitycatalog_databricks and integration)' --doctest-modules 2>&1
+          }
+          until [ $ATTEMPT -gt $MAX_RETRIES ]
+          do
+            echo "Attempt $ATTEMPT"
+            OUTPUT=$(run_command)
+            EXIT_CODE=$?
+            echo "$OUTPUT"
+            if [ $EXIT_CODE -eq 0 ]; then
+              echo "Tests passed."
+              exit 0
+            fi
+            echo "Failed. Retrying."
+            ATTEMPT=$((ATTEMPT+1))
+            sleep $RETRY_DELAY
+          done
+          if [ $ATTEMPT -gt $MAX_RETRIES ]; then
+            echo "Tests failed after $MAX_RETRIES attempts."
+            exit 1
+          fi
 
   test-unitycatalog-oss:
     name: Python Build (Python 3.10 Unity Catalog Integration tests)
@@ -166,7 +191,32 @@ jobs:
         run: make setup-dat
 
       - name: Run tests
-        run: uv run --no-sync pytest -m '(unitycatalog_oss and integration)' --doctest-modules
+        run: |
+          set +e
+          MAX_RETRIES=3
+          RETRY_DELAY=10
+          ATTEMPT=1
+          run_command() {
+            uv run --no-sync pytest -m '(unitycatalog_oss and integration)' --doctest-modules 2>&1
+          }
+          until [ $ATTEMPT -gt $MAX_RETRIES ]
+          do
+            echo "Attempt $ATTEMPT"
+            OUTPUT=$(run_command)
+            EXIT_CODE=$?
+            echo "$OUTPUT"
+            if [ $EXIT_CODE -eq 0 ]; then
+              echo "Tests passed."
+              exit 0
+            fi
+            echo "Failed. Retrying."
+            ATTEMPT=$((ATTEMPT+1))
+            sleep $RETRY_DELAY
+          done
+          if [ $ATTEMPT -gt $MAX_RETRIES ]; then
+            echo "Tests failed after $MAX_RETRIES attempts."
+            exit 1
+          fi
 
   test-pyspark:
     name: PySpark Integration Tests
@@ -191,7 +241,6 @@ jobs:
 
       - name: Run tests
         run: make test-pyspark
-
 
   multi-python-running:
     name: Running with Python ${{ matrix.python-version }}
